@@ -83,7 +83,7 @@ int traiterTir(char grille[DIM][DIM][3], int* vieBateaux, int i, int j, char* re
         strcpy(reponse, "invalide");
         return 0;
     }
-    if (strcmp(grille[i][j], "-") != 0 && strcmp(grille[i][j], "X") != 0) {
+    if (strcmp(grille[i][j], "-") != 0 && strcmp(grille[i][j], "X") != 0 && strcmp(grille[i][j], "O") != 0) {
         char symbole = grille[i][j][0];
         grille[i][j][0] = 'X'; grille[i][j][1] = '\0';
         vieBateaux[symbole]--;
@@ -92,6 +92,10 @@ int traiterTir(char grille[DIM][DIM][3], int* vieBateaux, int i, int j, char* re
         else
             strcpy(reponse, "touche");
         return 1;
+    } else if (strcmp(grille[i][j], "-") == 0) {
+        strcpy(grille[i][j], "O"); // Ajout : marque l'eau
+        strcpy(reponse, "eau");
+        return 0;
     } else {
         strcpy(reponse, "eau");
         return 0;
