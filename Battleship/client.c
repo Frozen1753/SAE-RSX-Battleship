@@ -25,11 +25,15 @@ int lettreVersIndice(char lettre) {
     return (lettre >= 'A' && lettre <= 'J') ? (lettre - 'A' + 1) : 0;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("Usage: %s <adresse_ip_serveur>\n", argv[0]);
+        return 1;
+    }
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("192.168.43.218"); // Adresse du serveur
+    serv_addr.sin_addr.s_addr = inet_addr(argv[1]); // Adresse du serveur passée en argument
     serv_addr.sin_port = htons(12345);
 
     if (connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
