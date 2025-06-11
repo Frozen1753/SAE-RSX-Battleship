@@ -65,6 +65,9 @@ Pour rendre le serveur WSL accessible, il faut demander à Windows de rediriger 
 
 3. **Connectez-vous depuis le client à l'IP de la machine Windows**  
    Sur la machine cliente, utilisez l'adresse IP de la machine Windows comme adresse du serveur.
+   ```
+   ./client <IP_machine_windows>
+   ```
 
 4. **Vérifiez le pare-feu Windows**  
    Pensez à ouvrir le port 12345 dans le pare-feu Windows si besoin.
