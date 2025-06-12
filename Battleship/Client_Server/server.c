@@ -54,7 +54,6 @@ void placerBateau(int taille, int rot, int i, int j, char symbole, char grille[D
     }
 }
 
-
 void afficherGrille(char grille[DIM][DIM][3]) {
     for (int i = 0; i < DIM; i++) {
         for (int j = 0; j < DIM; j++) {
@@ -64,12 +63,10 @@ void afficherGrille(char grille[DIM][DIM][3]) {
     }
 }
 
-// Ajoute cette fonction pour afficher la grille de l'adversaire (comme dans le client)
 void afficherGrilleEnnemie(char grille[DIM][DIM][3]) {
     printf("Grille ennemie (vos tirs) :\n");
     for (int i = 0; i < DIM; i++) {
         for (int j = 0; j < DIM; j++) {
-            // Affiche seulement les coups joués (X, O), sinon "·"
             if (i == 0 || j == 0) {
                 printf("%s ", grille[i][j]);
             } else if (strcmp(grille[i][j], "X") == 0 || strcmp(grille[i][j], "O") == 0) {
@@ -147,7 +144,6 @@ void placementManuel(char grille[DIM][DIM][3], Bateau flotte[]) {
 
 int main() {
     srand(time(NULL));
-    // --- Initialisation réseau ---
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
@@ -159,7 +155,6 @@ int main() {
     int client_sock = accept(sockfd, NULL, NULL);
     printf("Client connecté !\n");
 
-    // --- Synchronisation : attendre que le client soit prêt ---
     char syncbuf[16];
     int syncn = recv(client_sock, syncbuf, sizeof(syncbuf)-1, 0);
     if (syncn <= 0 || strncmp(syncbuf, "pret", 4) != 0) {
@@ -169,7 +164,6 @@ int main() {
         return 1;
     }
 
-    // --- Placement manuel des bateaux du serveur ---
     char grilleServeur[DIM][DIM][3];
     initialiserGrille(grilleServeur);
     Bateau flotteServeur[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
@@ -177,56 +171,81 @@ int main() {
     vieServeur['#'] = 5; vieServeur['@'] = 4; vieServeur['%'] = 3; vieServeur['&'] = 3; vieServeur['$'] = 2;
     placementManuel(grilleServeur, flotteServeur);
 
-    // Répondre au client qu'on est prêt
     send(client_sock, "pret", 4, 0);
 
-    // --- Boucle de jeu ---
     char buffer[32], reponse[16];
-    // Grille pour suivre les tirs sur l'ennemi
     char grilleEnnemie[DIM][DIM][3];
     initialiserGrille(grilleEnnemie);
+
+    int n;
+    char lettre;
+    int chiffre;
+
     while (1) {
-        // 1. Le client tire sur le serveur
-        int n = recv(client_sock, buffer, sizeof(buffer)-1, 0);
-        if (n <= 0) break;
-        buffer[n] = 0;
-        char lettre;
-        int chiffre;
-        if (sscanf(buffer, " %c%d", &lettre, &chiffre) != 2) {
-            send(client_sock, "invalide", 8, 0);
-            continue;
-        }
-        int i = lettreVersIndice(lettre);
-        int j = chiffre;
-        if (!valides(i, j)) {
-            send(client_sock, "invalide", 8, 0);
-            continue;
-        }
-        traiterTir(grilleServeur, vieServeur, i, j, reponse);
-        send(client_sock, reponse, strlen(reponse), 0);
+        int coup_valide = 0;
+        while (!coup_valide) {
+            n = recv(client_sock, buffer, sizeof(buffer)-1, 0);
+            if (n <= 0) goto fin_serveur;
+            buffer[n] = 0;
+            char lettre;
+            int chiffre;
+            if (sscanf(buffer, " %c%d", &lettre, &chiffre) != 2) {
+                send(client_sock, "invalide", 8, 0);
+                continue;
+            }
+            int i = lettreVersIndice(lettre);
+            int j = chiffre;
+            if (!valides(i, j)) {
+                send(client_sock, "invalide", 8, 0);
+                continue;
+            }
+            if (strcmp(grilleServeur[i][j], "X") == 0 || strcmp(grilleServeur[i][j], "O") == 0) {
+                send(client_sock, "invalide", 8, 0);
+                continue;
+            }
+            traiterTir(grilleServeur, vieServeur, i, j, reponse);
+            send(client_sock, reponse, strlen(reponse), 0);
 
-        printf("Le client a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
-        afficherGrille(grilleServeur);
+            printf("Le client a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
+            afficherGrille(grilleServeur);
+            coup_valide = 1;
+        }
 
-        // Vérifier victoire du client
         if (vieServeur['#'] == 0 && vieServeur['@'] == 0 && vieServeur['%'] == 0 && vieServeur['&'] == 0 && vieServeur['$'] == 0) {
             send(client_sock, "victoire", 8, 0);
             printf("Le client a gagné !\n");
             break;
         }
 
-        // 2. Le serveur (humain) tire sur le client
         char coup[16];
-        demanderTir(coup);
+        int tir_valide = 0;
+        while (!tir_valide) {
+            demanderTir(coup);
+            char lettreTir;
+            int chiffreTir;
+            if (sscanf(coup, " %c%d", &lettreTir, &chiffreTir) != 2) {
+                printf("Coup invalide, réessayez.\n");
+                continue;
+            }
+            int iTir = lettreVersIndice(lettreTir);
+            int jTir = chiffreTir;
+            if (!valides(iTir, jTir)) {
+                printf("Coup hors grille, réessayez.\n");
+                continue;
+            }
+            if (strcmp(grilleEnnemie[iTir][jTir], "X") == 0 || strcmp(grilleEnnemie[iTir][jTir], "O") == 0) {
+                printf("Vous avez déjà tiré ici, réessayez.\n");
+                continue;
+            }
+            tir_valide = 1;
+        }
         send(client_sock, coup, strlen(coup), 0);
 
-        // 3. Recevoir la réponse du client
         n = recv(client_sock, reponse, sizeof(reponse)-1, 0);
         if (n <= 0) break;
         reponse[n] = 0;
         printf("Réponse du client à %s : %s\n", coup, reponse);
 
-        // Mettre à jour la grille ennemie
         if (sscanf(coup, " %c%d", &lettre, &chiffre) == 2) {
             int i = lettreVersIndice(lettre);
             int j = chiffre;
@@ -237,16 +256,16 @@ int main() {
             }
         }
         
-        afficherGrille(grilleServeur);         // Affiche ta grille (avec tes bateaux)
-        afficherGrilleEnnemie(grilleEnnemie);  // Affiche la grille adverse (seulement tes tirs)
+        afficherGrille(grilleServeur);
+        afficherGrilleEnnemie(grilleEnnemie);
 
-        // Vérifier victoire du serveur
         if (strcmp(reponse, "victoire") == 0) {
             printf("Le serveur a gagné !\n");
             break;
         }
     }
 
+fin_serveur:
     close(client_sock);
     close(sockfd);
     return 0;
