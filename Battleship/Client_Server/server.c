@@ -54,26 +54,20 @@ void placerBateau(int taille, int rot, int i, int j, char symbole, char grille[D
     }
 }
 
-
-void afficherGrille(char grille[DIM][DIM][3]) {
+void afficherDeuxGrilles(char grillePerso[DIM][DIM][3], char grilleEnnemie[DIM][DIM][3]) {
+    printf("Votre grille :%*sGrille ennemie (vos tirs) :\n", 20, "");
     for (int i = 0; i < DIM; i++) {
+        // Grille perso
         for (int j = 0; j < DIM; j++) {
-            printf("%s ", grille[i][j]);
+            printf("%s ", grillePerso[i][j]);
         }
-        printf("\n");
-    }
-}
-
-// Ajoute cette fonction pour afficher la grille de l'adversaire (comme dans le client)
-void afficherGrilleEnnemie(char grille[DIM][DIM][3]) {
-    printf("Grille ennemie (vos tirs) :\n");
-    for (int i = 0; i < DIM; i++) {
+        printf("%*s", 6, ""); // Espace entre les deux grilles
+        // Grille ennemie
         for (int j = 0; j < DIM; j++) {
-            // Affiche seulement les coups joués (X, O), sinon "·"
             if (i == 0 || j == 0) {
-                printf("%s ", grille[i][j]);
-            } else if (strcmp(grille[i][j], "X") == 0 || strcmp(grille[i][j], "O") == 0) {
-                printf("%s ", grille[i][j]);
+                printf("%s ", grilleEnnemie[i][j]);
+            } else if (strcmp(grilleEnnemie[i][j], "X") == 0 || strcmp(grilleEnnemie[i][j], "O") == 0) {
+                printf("%s ", grilleEnnemie[i][j]);
             } else {
                 printf("· ");
             }
@@ -120,7 +114,7 @@ void placementManuel(char grille[DIM][DIM][3], Bateau flotte[]) {
     for (int b = 0; b < 5; b++) {
         int ok = 0;
         while (!ok) {
-            afficherGrille(grille);
+            afficherDeuxGrilles(grille, NULL); // NULL pour pas d'affichage ennemi
             printf("Placer le bateau %c (taille %d)\n", flotte[b].symbole, flotte[b].taille);
             char ligne[8];
             char lettre;
@@ -147,7 +141,6 @@ void placementManuel(char grille[DIM][DIM][3], Bateau flotte[]) {
 
 int main() {
     srand(time(NULL));
-    // --- Initialisation réseau ---
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
@@ -159,7 +152,7 @@ int main() {
     int client_sock = accept(sockfd, NULL, NULL);
     printf("Client connecté !\n");
 
-    // --- Synchronisation : attendre que le client soit prêt ---
+    // Synchronisation
     char syncbuf[16];
     int syncn = recv(client_sock, syncbuf, sizeof(syncbuf)-1, 0);
     if (syncn <= 0 || strncmp(syncbuf, "pret", 4) != 0) {
@@ -169,7 +162,7 @@ int main() {
         return 1;
     }
 
-    // --- Placement manuel des bateaux du serveur ---
+    // Placement manuel des bateaux du serveur
     char grilleServeur[DIM][DIM][3];
     initialiserGrille(grilleServeur);
     Bateau flotteServeur[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
@@ -180,9 +173,8 @@ int main() {
     // Répondre au client qu'on est prêt
     send(client_sock, "pret", 4, 0);
 
-    // --- Boucle de jeu ---
+    // Boucle de jeu
     char buffer[32], reponse[16];
-    // Grille pour suivre les tirs sur l'ennemi
     char grilleEnnemie[DIM][DIM][3];
     initialiserGrille(grilleEnnemie);
     while (1) {
@@ -202,7 +194,7 @@ int main() {
         send(client_sock, reponse, strlen(reponse), 0);
 
         printf("Le client a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
-        afficherGrille(grilleServeur);
+        afficherDeuxGrilles(grilleServeur, grilleEnnemie);
 
         // Vérifier victoire du client
         if (vieServeur['#'] == 0 && vieServeur['@'] == 0 && vieServeur['%'] == 0 && vieServeur['&'] == 0 && vieServeur['$'] == 0) {
@@ -232,7 +224,7 @@ int main() {
                 strcpy(grilleEnnemie[i][j], "O");
             }
         }
-        afficherGrilleEnnemie(grilleEnnemie);
+        afficherDeuxGrilles(grilleServeur, grilleEnnemie);
 
         // Vérifier victoire du serveur
         if (strcmp(reponse, "victoire") == 0) {

@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <ctype.h>
-#include <time.h>
 
 #define DIM 11
 const char* ALPHA[] = { "A","B","C","D","E","F","G","H","I","J" };
@@ -25,15 +24,6 @@ void initialiserGrille(char grille[DIM][DIM][3]) {
     for (int i = 1; i < DIM; i++)
         for (int j = 1; j < DIM; j++)
             strcpy(grille[i][j], "-");
-}
-
-void afficherGrille(char grille[DIM][DIM][3]) {
-    for (int i = 0; i < DIM; i++) {
-        for (int j = 0; j < DIM; j++) {
-            printf("%s ", grille[i][j]);
-        }
-        printf("\n");
-    }
 }
 
 int lettreVersIndice(char lettre) {
@@ -63,89 +53,80 @@ void placerBateau(int taille, int rot, int i, int j, char symbole, char grille[D
     }
 }
 
+void afficherDeuxGrilles(char grillePerso[DIM][DIM][3], char grilleEnnemie[DIM][DIM][3]) {
+    printf("Votre grille :%*sGrille ennemie (vos tirs) :\n", 20, "");
+    for (int i = 0; i < DIM; i++) {
+        // Grille perso
+        for (int j = 0; j < DIM; j++) {
+            printf("%s ", grillePerso[i][j]);
+        }
+        printf("%*s", 6, ""); // Espace entre les deux grilles
+        // Grille ennemie
+        for (int j = 0; j < DIM; j++) {
+            if (i == 0 || j == 0) {
+                printf("%s ", grilleEnnemie[i][j]);
+            } else if (strcmp(grilleEnnemie[i][j], "X") == 0 || strcmp(grilleEnnemie[i][j], "O") == 0) {
+                printf("%s ", grilleEnnemie[i][j]);
+            } else {
+                printf("· ");
+            }
+        }
+        printf("\n");
+    }
+}
+
 void placementManuel(char grille[DIM][DIM][3], Bateau flotte[]) {
-    printf("Placement de vos bateaux :\n");
+    printf("=== Placement manuel des bateaux (Client) ===\n");
     for (int b = 0; b < 5; b++) {
         int ok = 0;
         while (!ok) {
-            afficherGrille(grille);
-            printf("Bateau %d (taille %d, symbole %c)\n", b+1, flotte[b].taille, flotte[b].symbole);
-            printf("Lettre (A-J) : ");
+            afficherDeuxGrilles(grille, NULL);
+            printf("Placer le bateau %c (taille %d)\n", flotte[b].symbole, flotte[b].taille);
+            char ligne[8];
             char lettre;
-            scanf(" %c", &lettre);
-            int i = lettreVersIndice(lettre);
-            printf("Chiffre (1-10) : ");
-            int j;
-            scanf("%d", &j);
-            printf("Rotation (1=nord, 2=est, 3=sud, 4=ouest) : ");
-            int rot;
+            int chiffre, rot;
+            printf("Entrer la case de départ (ex: B5) : ");
+            scanf("%s", ligne);
+            if (sscanf(ligne, " %c%d", &lettre, &chiffre) != 2) {
+                printf("Entrée invalide.\n");
+                continue;
+            }
+            printf("Orientation (1=haut, 2=droite, 3=bas, 4=gauche) : ");
             scanf("%d", &rot);
+            int i = lettreVersIndice(lettre);
+            int j = chiffre;
             if (peutPlacer(flotte[b].taille, rot, i, j, grille)) {
                 placerBateau(flotte[b].taille, rot, i, j, flotte[b].symbole, grille);
                 ok = 1;
             } else {
-                printf("Placement invalide, recommencez.\n");
+                printf("Placement impossible, réessayez.\n");
             }
         }
     }
 }
 
-int traiterTir(char grille[DIM][DIM][3], int* vieBateaux, int i, int j, char* reponse) {
-    if (!valides(i, j)) {
-        strcpy(reponse, "invalide");
-        return 0;
-    }
-    if (strcmp(grille[i][j], "-") != 0 && strcmp(grille[i][j], "X") != 0 && strcmp(grille[i][j], "O") != 0) {
-        char symbole = grille[i][j][0];
-        grille[i][j][0] = 'X'; grille[i][j][1] = '\0';
-        vieBateaux[symbole]--;
-        if (vieBateaux[symbole] == 0)
-            strcpy(reponse, "coule");
-        else
-            strcpy(reponse, "touche");
-        return 1;
-    } else if (strcmp(grille[i][j], "-") == 0) {
-        strcpy(grille[i][j], "O");
-        strcpy(reponse, "eau");
-        return 0;
-    } else {
-        strcpy(reponse, "eau");
-        return 0;
-    }
-}
-
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: %s <adresse_ip_serveur>\n", argv[0]);
-        return 1;
-    }
+int main() {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
     serv_addr.sin_port = htons(12345);
+    inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
 
     if (connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("Connexion échouée");
+        printf("Erreur de connexion au serveur\n");
         return 1;
     }
-    printf("Connecté au serveur !\n");
 
-    // Initialisation des grilles et flottes
-    char grilleJoueur[DIM][DIM][3], grilleTirs[DIM][DIM][3];
+    // Placement manuel des bateaux du client
+    char grilleJoueur[DIM][DIM][3];
     initialiserGrille(grilleJoueur);
-    initialiserGrille(grilleTirs);
     Bateau flotteJoueur[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
     int vieJoueur[128] = {0};
     vieJoueur['#'] = 5; vieJoueur['@'] = 4; vieJoueur['%'] = 3; vieJoueur['&'] = 3; vieJoueur['$'] = 2;
-
-    // Placement manuel du joueur client
     placementManuel(grilleJoueur, flotteJoueur);
 
-    // Synchronisation : prévenir le serveur qu'on est prêt
+    // Synchronisation
     send(sockfd, "pret", 4, 0);
-
-    // Attendre la réponse du serveur
     char syncbuf[16];
     int syncn = recv(sockfd, syncbuf, sizeof(syncbuf)-1, 0);
     if (syncn <= 0 || strncmp(syncbuf, "pret", 4) != 0) {
@@ -154,36 +135,36 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Boucle de jeu
     char buffer[32], reponse[16];
+    char grilleEnnemie[DIM][DIM][3];
+    initialiserGrille(grilleEnnemie);
     while (1) {
-        // 1. Le client tire sur le serveur
-        afficherGrille(grilleTirs);
-        printf("A vous de tirer !\n");
-        char coup[16];
-        printf("Entrez votre coup (ex: B5) : ");
-        scanf("%s", coup);
-        send(sockfd, coup, strlen(coup), 0);
+        // 1. Le client (humain) tire sur le serveur
+        afficherDeuxGrilles(grilleJoueur, grilleEnnemie);
+        printf("À vous de tirer !\nEntrez votre coup (ex: B5) : ");
+        scanf("%s", buffer);
+        send(sockfd, buffer, strlen(buffer), 0);
 
         // 2. Recevoir la réponse du serveur
         int n = recv(sockfd, reponse, sizeof(reponse)-1, 0);
-        if (n <= 0) {
-            printf("Déconnexion du serveur.\n");
-            break;
-        }
+        if (n <= 0) break;
         reponse[n] = 0;
-        printf("Réponse du serveur : %s\n", reponse);
+        printf("Réponse du serveur à %s : %s\n", buffer, reponse);
 
-        // Mettre à jour la grille de tirs
+        // Mettre à jour la grille ennemie
         char lettre;
         int chiffre;
-        if (sscanf(coup, " %c%d", &lettre, &chiffre) == 2) {
-            int ti = lettreVersIndice(lettre);
-            int tj = chiffre;
-            if (strncmp(reponse, "touche", 6) == 0 || strncmp(reponse, "coule", 5) == 0)
-                strcpy(grilleTirs[ti][tj], "X");
-            else if (strncmp(reponse, "eau", 3) == 0)
-                strcpy(grilleTirs[ti][tj], "O");
+        if (sscanf(buffer, " %c%d", &lettre, &chiffre) == 2) {
+            int i = lettreVersIndice(lettre);
+            int j = chiffre;
+            if (strcmp(reponse, "touche") == 0 || strcmp(reponse, "coule") == 0) {
+                strcpy(grilleEnnemie[i][j], "X");
+            } else if (strcmp(reponse, "eau") == 0) {
+                strcpy(grilleEnnemie[i][j], "O");
+            }
         }
+        afficherDeuxGrilles(grilleJoueur, grilleEnnemie);
 
         // Vérifier victoire du client
         if (strcmp(reponse, "victoire") == 0) {
@@ -195,17 +176,35 @@ int main(int argc, char *argv[]) {
         n = recv(sockfd, buffer, sizeof(buffer)-1, 0);
         if (n <= 0) break;
         buffer[n] = 0;
+        printf("Le serveur tire sur %s\n", buffer);
+
+        // 4. Traiter le tir du serveur
         if (sscanf(buffer, " %c%d", &lettre, &chiffre) != 2) {
             send(sockfd, "invalide", 8, 0);
             continue;
         }
         int i = lettreVersIndice(lettre);
         int j = chiffre;
-        traiterTir(grilleJoueur, vieJoueur, i, j, reponse);
-        send(sockfd, reponse, strlen(reponse), 0);
-
-        printf("Le serveur a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
-        afficherGrille(grilleJoueur);
+        char rep[16];
+        if (!valides(i, j)) {
+            strcpy(rep, "invalide");
+        } else if (strcmp(grilleJoueur[i][j], "-") != 0 && strcmp(grilleJoueur[i][j], "X") != 0 && strcmp(grilleJoueur[i][j], "O") != 0) {
+            char symbole = grilleJoueur[i][j][0];
+            grilleJoueur[i][j][0] = 'X'; grilleJoueur[i][j][1] = '\0';
+            if (vieJoueur[(int)symbole] > 0) vieJoueur[(int)symbole]--;
+            if (vieJoueur[(int)symbole] == 0)
+                strcpy(rep, "coule");
+            else
+                strcpy(rep, "touche");
+        } else if (strcmp(grilleJoueur[i][j], "-") == 0) {
+            strcpy(grilleJoueur[i][j], "O");
+            strcpy(rep, "eau");
+        } else if (strcmp(grilleJoueur[i][j], "X") == 0 || strcmp(grilleJoueur[i][j], "O") == 0) {
+            strcpy(rep, "deja");
+        } else {
+            strcpy(rep, "eau");
+        }
+        send(sockfd, rep, strlen(rep), 0);
 
         // Vérifier victoire du serveur
         if (vieJoueur['#'] == 0 && vieJoueur['@'] == 0 && vieJoueur['%'] == 0 && vieJoueur['&'] == 0 && vieJoueur['$'] == 0) {
