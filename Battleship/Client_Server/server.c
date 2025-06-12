@@ -86,20 +86,29 @@ int traiterTir(char grille[DIM][DIM][3], int* vieBateaux, int i, int j, char* re
     if (strcmp(grille[i][j], "-") != 0 && strcmp(grille[i][j], "X") != 0 && strcmp(grille[i][j], "O") != 0) {
         char symbole = grille[i][j][0];
         grille[i][j][0] = 'X'; grille[i][j][1] = '\0';
-        vieBateaux[symbole]--;
-        if (vieBateaux[symbole] == 0)
+        if (vieBateaux[(int)symbole] > 0) vieBateaux[(int)symbole]--;
+        if (vieBateaux[(int)symbole] == 0)
             strcpy(reponse, "coule");
         else
             strcpy(reponse, "touche");
         return 1;
     } else if (strcmp(grille[i][j], "-") == 0) {
-        strcpy(grille[i][j], "O"); // Ajout : marque l'eau
+        strcpy(grille[i][j], "O");
         strcpy(reponse, "eau");
+        return 0;
+    } else if (strcmp(grille[i][j], "X") == 0 || strcmp(grille[i][j], "O") == 0) {
+        strcpy(reponse, "deja");
         return 0;
     } else {
         strcpy(reponse, "eau");
         return 0;
     }
+}
+
+void demanderTir(char* coup) {
+    printf("À vous de tirer !\n");
+    printf("Entrez votre coup (ex: B5) : ");
+    scanf("%s", coup);
 }
 
 int main() {
@@ -126,24 +135,24 @@ int main() {
         return 1;
     }
 
-    // --- Initialisation jeu IA (APRÈS réception du "pret") ---
-    char grilleIA[DIM][DIM][3];
-    initialiserGrille(grilleIA);
-    Bateau flotteIA[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
-    int vieIA[128] = {0};
-    vieIA['#'] = 5; vieIA['@'] = 4; vieIA['%'] = 3; vieIA['&'] = 3; vieIA['$'] = 2;
-    placementIA(grilleIA, flotteIA);
+    // --- Initialisation jeu joueur serveur (APRÈS réception du "pret") ---
+    char grilleServeur[DIM][DIM][3];
+    initialiserGrille(grilleServeur);
+    Bateau flotteServeur[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
+    int vieServeur[128] = {0};
+    vieServeur['#'] = 5; vieServeur['@'] = 4; vieServeur['%'] = 3; vieServeur['&'] = 3; vieServeur['$'] = 2;
+    placementIA(grilleServeur, flotteServeur);
 
     // Répondre au client qu'on est prêt
     send(client_sock, "pret", 4, 0);
 
     // --- Boucle de jeu ---
-    char buffer[32];
+    char buffer[32], reponse[16];
     while (1) {
+        // 1. Le client tire sur le serveur
         int n = recv(client_sock, buffer, sizeof(buffer)-1, 0);
         if (n <= 0) break;
         buffer[n] = 0;
-        // Format attendu : "B5"
         char lettre;
         int chiffre;
         if (sscanf(buffer, " %c%d", &lettre, &chiffre) != 2) {
@@ -152,18 +161,36 @@ int main() {
         }
         int i = lettreVersIndice(lettre);
         int j = chiffre;
-        char reponse[16];
-        traiterTir(grilleIA, vieIA, i, j, reponse);
+        traiterTir(grilleServeur, vieServeur, i, j, reponse); // <-- ici
         send(client_sock, reponse, strlen(reponse), 0);
 
-        // Optionnel : afficher la grille côté serveur
-        printf("Tir reçu : %c%d -> %s\n", lettre, chiffre, reponse);
-        afficherGrille(grilleIA);
+        printf("Le client a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
+        afficherGrille(grilleServeur);
 
-        // Vérifier victoire
-        if (vieIA['#'] == 0 && vieIA['@'] == 0 && vieIA['%'] == 0 && vieIA['&'] == 0 && vieIA['$'] == 0) {
+        // Vérifier victoire du client
+        if (vieServeur['#'] == 0 && vieServeur['@'] == 0 && vieServeur['%'] == 0 && vieServeur['&'] == 0 && vieServeur['$'] == 0) {
             send(client_sock, "victoire", 8, 0);
             printf("Le client a gagné !\n");
+            break;
+        }
+
+        // 2. Le serveur (humain) tire sur le client
+        char coup[16];
+        demanderTir(coup);
+        send(client_sock, coup, strlen(coup), 0);
+
+        // 3. Recevoir la réponse du client
+        n = recv(client_sock, reponse, sizeof(reponse)-1, 0);
+        if (n <= 0) break;
+        reponse[n] = 0;
+        printf("Réponse du client à %s : %s\n", coup, reponse);
+
+        // Mettre à jour la grille de tirs du serveur (optionnel)
+        // ... (vous pouvez ajouter une grille de tirs côté serveur si vous voulez)
+
+        // Vérifier victoire du serveur
+        if (strcmp(reponse, "victoire") == 0) {
+            printf("Le serveur a gagné !\n");
             break;
         }
     }

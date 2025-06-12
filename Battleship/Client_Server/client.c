@@ -156,12 +156,45 @@ int main(int argc, char *argv[]) {
 
     char buffer[32], reponse[16];
     while (1) {
-        // 1. Le serveur tire sur le client
-        int n = recv(sockfd, buffer, sizeof(buffer)-1, 0);
-        if (n <= 0) break;
-        buffer[n] = 0;
+        // 1. Le client tire sur le serveur
+        afficherGrille(grilleTirs);
+        printf("A vous de tirer !\n");
+        char coup[16];
+        printf("Entrez votre coup (ex: B5) : ");
+        scanf("%s", coup);
+        send(sockfd, coup, strlen(coup), 0);
+
+        // 2. Recevoir la réponse du serveur
+        int n = recv(sockfd, reponse, sizeof(reponse)-1, 0);
+        if (n <= 0) {
+            printf("Déconnexion du serveur.\n");
+            break;
+        }
+        reponse[n] = 0;
+        printf("Réponse du serveur : %s\n", reponse);
+
+        // Mettre à jour la grille de tirs
         char lettre;
         int chiffre;
+        if (sscanf(coup, " %c%d", &lettre, &chiffre) == 2) {
+            int ti = lettreVersIndice(lettre);
+            int tj = chiffre;
+            if (strncmp(reponse, "touche", 6) == 0 || strncmp(reponse, "coule", 5) == 0)
+                strcpy(grilleTirs[ti][tj], "X");
+            else if (strncmp(reponse, "eau", 3) == 0)
+                strcpy(grilleTirs[ti][tj], "O");
+        }
+
+        // Vérifier victoire du client
+        if (strcmp(reponse, "victoire") == 0) {
+            printf("Vous avez gagné !\n");
+            break;
+        }
+
+        // 3. Le serveur tire sur le client
+        n = recv(sockfd, buffer, sizeof(buffer)-1, 0);
+        if (n <= 0) break;
+        buffer[n] = 0;
         if (sscanf(buffer, " %c%d", &lettre, &chiffre) != 2) {
             send(sockfd, "invalide", 8, 0);
             continue;
@@ -178,39 +211,6 @@ int main(int argc, char *argv[]) {
         if (vieJoueur['#'] == 0 && vieJoueur['@'] == 0 && vieJoueur['%'] == 0 && vieJoueur['&'] == 0 && vieJoueur['$'] == 0) {
             send(sockfd, "victoire", 8, 0);
             printf("Le serveur a gagné !\n");
-            break;
-        }
-
-        // 2. Le client tire sur le serveur
-        afficherGrille(grilleTirs);
-        printf("A vous de tirer !\n");
-        char coup[16];
-        printf("Entrez votre coup (ex: B5) : ");
-        scanf("%s", coup);
-        send(sockfd, coup, strlen(coup), 0);
-
-        // 3. Recevoir la réponse du serveur
-        n = recv(sockfd, reponse, sizeof(reponse)-1, 0);
-        if (n <= 0) {
-            printf("Déconnexion du serveur.\n");
-            break;
-        }
-        reponse[n] = 0;
-        printf("Réponse du serveur : %s\n", reponse);
-
-        // Mettre à jour la grille de tirs
-        if (sscanf(coup, " %c%d", &lettre, &chiffre) == 2) {
-            int ti = lettreVersIndice(lettre);
-            int tj = chiffre;
-            if (strncmp(reponse, "touche", 6) == 0 || strncmp(reponse, "coule", 5) == 0)
-                strcpy(grilleTirs[ti][tj], "X");
-            else if (strncmp(reponse, "eau", 3) == 0)
-                strcpy(grilleTirs[ti][tj], "O");
-        }
-
-        // Vérifier victoire du client
-        if (strcmp(reponse, "victoire") == 0) {
-            printf("Vous avez gagné !\n");
             break;
         }
     }
