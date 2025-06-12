@@ -64,6 +64,24 @@ void afficherGrille(char grille[DIM][DIM][3]) {
     }
 }
 
+// Ajoute cette fonction pour afficher la grille de l'adversaire (comme dans le client)
+void afficherGrilleEnnemie(char grille[DIM][DIM][3]) {
+    printf("Grille ennemie (vos tirs) :\n");
+    for (int i = 0; i < DIM; i++) {
+        for (int j = 0; j < DIM; j++) {
+            // Affiche seulement les coups joués (X, O), sinon "·"
+            if (i == 0 || j == 0) {
+                printf("%s ", grille[i][j]);
+            } else if (strcmp(grille[i][j], "X") == 0 || strcmp(grille[i][j], "O") == 0) {
+                printf("%s ", grille[i][j]);
+            } else {
+                printf("· ");
+            }
+        }
+        printf("\n");
+    }
+}
+
 int traiterTir(char grille[DIM][DIM][3], int* vieBateaux, int i, int j, char* reponse) {
     if (!valides(i, j)) {
         strcpy(reponse, "invalide");
@@ -164,6 +182,9 @@ int main() {
 
     // --- Boucle de jeu ---
     char buffer[32], reponse[16];
+    // Grille pour suivre les tirs sur l'ennemi
+    char grilleEnnemie[DIM][DIM][3];
+    initialiserGrille(grilleEnnemie);
     while (1) {
         // 1. Le client tire sur le serveur
         int n = recv(client_sock, buffer, sizeof(buffer)-1, 0);
@@ -200,6 +221,18 @@ int main() {
         if (n <= 0) break;
         reponse[n] = 0;
         printf("Réponse du client à %s : %s\n", coup, reponse);
+
+        // Mettre à jour la grille ennemie
+        if (sscanf(coup, " %c%d", &lettre, &chiffre) == 2) {
+            int i = lettreVersIndice(lettre);
+            int j = chiffre;
+            if (strcmp(reponse, "touche") == 0 || strcmp(reponse, "coule") == 0) {
+                strcpy(grilleEnnemie[i][j], "X");
+            } else if (strcmp(reponse, "eau") == 0) {
+                strcpy(grilleEnnemie[i][j], "O");
+            }
+        }
+        afficherGrilleEnnemie(grilleEnnemie);
 
         // Vérifier victoire du serveur
         if (strcmp(reponse, "victoire") == 0) {
