@@ -213,7 +213,9 @@ int main() {
 
         if (vieServeur['#'] == 0 && vieServeur['@'] == 0 && vieServeur['%'] == 0 && vieServeur['&'] == 0 && vieServeur['$'] == 0) {
             send(client_sock, "victoire", 8, 0);
-            printf("Le client a gagné !\n");
+            printf("\n=== FIN DE PARTIE ===\n");
+            printf("Bravo ! Le client a coulé tous vos bateaux et remporte la victoire !\n");
+            printf("=====================\n");
             break;
         }
 
