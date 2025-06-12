@@ -116,14 +116,6 @@ int main() {
     int client_sock = accept(sockfd, NULL, NULL);
     printf("Client connecté !\n");
 
-    // --- Initialisation jeu IA ---
-    char grilleIA[DIM][DIM][3];
-    initialiserGrille(grilleIA);
-    Bateau flotteIA[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
-    int vieIA[128] = {0};
-    vieIA['#'] = 5; vieIA['@'] = 4; vieIA['%'] = 3; vieIA['&'] = 3; vieIA['$'] = 2;
-    placementIA(grilleIA, flotteIA);
-
     // --- Synchronisation : attendre que le client soit prêt ---
     char syncbuf[16];
     int syncn = recv(client_sock, syncbuf, sizeof(syncbuf)-1, 0);
@@ -133,6 +125,17 @@ int main() {
         close(sockfd);
         return 1;
     }
+
+    // --- Initialisation jeu IA (APRÈS réception du "pret") ---
+    char grilleIA[DIM][DIM][3];
+    initialiserGrille(grilleIA);
+    Bateau flotteIA[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
+    int vieIA[128] = {0};
+    vieIA['#'] = 5; vieIA['@'] = 4; vieIA['%'] = 3; vieIA['&'] = 3; vieIA['$'] = 2;
+    placementIA(grilleIA, flotteIA);
+
+    // Répondre au client qu'on est prêt
+    send(client_sock, "pret", 4, 0);
 
     // --- Boucle de jeu ---
     char buffer[32];

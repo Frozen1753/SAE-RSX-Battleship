@@ -145,6 +145,15 @@ int main(int argc, char *argv[]) {
     // Synchronisation : prévenir le serveur qu'on est prêt
     send(sockfd, "pret", 4, 0);
 
+    // Attendre la réponse du serveur
+    char syncbuf[16];
+    int syncn = recv(sockfd, syncbuf, sizeof(syncbuf)-1, 0);
+    if (syncn <= 0 || strncmp(syncbuf, "pret", 4) != 0) {
+        printf("Erreur de synchronisation avec le serveur.\n");
+        close(sockfd);
+        return 1;
+    }
+
     char buffer[32], reponse[16];
     while (1) {
         // 1. Le serveur tire sur le client
