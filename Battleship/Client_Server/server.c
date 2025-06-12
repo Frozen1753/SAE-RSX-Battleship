@@ -233,7 +233,6 @@ int main() {
             }
         }
         
-        afficherGrilleEnnemie(grilleEnnemie);
         afficherGrille(grilleServeur);         // Affiche ta grille (avec tes bateaux)
         afficherGrilleEnnemie(grilleEnnemie);  // Affiche la grille adverse (seulement tes tirs)
 
