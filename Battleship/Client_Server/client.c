@@ -131,7 +131,6 @@ int main(int argc, char *argv[]) {
     }
     printf("Connecté au serveur !\n");
 
-    // Initialisation des grilles et flottes
     char grilleJoueur[DIM][DIM][3], grilleTirs[DIM][DIM][3];
     initialiserGrille(grilleJoueur);
     initialiserGrille(grilleTirs);
@@ -139,13 +138,10 @@ int main(int argc, char *argv[]) {
     int vieJoueur[128] = {0};
     vieJoueur['#'] = 5; vieJoueur['@'] = 4; vieJoueur['%'] = 3; vieJoueur['&'] = 3; vieJoueur['$'] = 2;
 
-    // Placement manuel du joueur client
     placementManuel(grilleJoueur, flotteJoueur);
 
-    // Synchronisation : prévenir le serveur qu'on est prêt
     send(sockfd, "pret", 4, 0);
 
-    // Attendre la réponse du serveur
     char syncbuf[16];
     int syncn = recv(sockfd, syncbuf, sizeof(syncbuf)-1, 0);
     if (syncn <= 0 || strncmp(syncbuf, "pret", 4) != 0) {
@@ -155,27 +151,54 @@ int main(int argc, char *argv[]) {
     }
 
     char buffer[32], reponse[16];
+    char coup[16];
+    char lettre;
+    int chiffre;
+    int n;
+
     while (1) {
-        // 1. Le client tire sur le serveur
-        afficherGrille(grilleTirs);
-        printf("A vous de tirer !\n");
-        char coup[16];
-        printf("Entrez votre coup (ex: B5) : ");
-        scanf("%s", coup);
-        send(sockfd, coup, strlen(coup), 0);
+        int tir_valide = 0;
+        while (!tir_valide) {
+            afficherGrille(grilleTirs);
+            printf("A vous de tirer !\n");
+            printf("Entrez votre coup (ex: B5) : ");
+            scanf("%s", coup);
 
-        // 2. Recevoir la réponse du serveur
-        int n = recv(sockfd, reponse, sizeof(reponse)-1, 0);
-        if (n <= 0) {
-            printf("Déconnexion du serveur.\n");
-            break;
+            char lettreTir;
+            int chiffreTir;
+            if (sscanf(coup, " %c%d", &lettreTir, &chiffreTir) != 2) {
+                printf("Coup invalide, réessayez.\n");
+                continue;
+            }
+            int iTir = lettreVersIndice(lettreTir);
+            int jTir = chiffreTir;
+            if (!valides(iTir, jTir)) {
+                printf("Coup hors grille, réessayez.\n");
+                continue;
+            }
+            if (strcmp(grilleTirs[iTir][jTir], "X") == 0 || strcmp(grilleTirs[iTir][jTir], "O") == 0) {
+                printf("Vous avez déjà tiré ici, réessayez.\n");
+                continue;
+            }
+
+            send(sockfd, coup, strlen(coup), 0);
+
+            n = recv(sockfd, reponse, sizeof(reponse)-1, 0);
+            if (n <= 0) {
+                printf("Déconnexion du serveur.\n");
+                exit(1);
+            }
+            reponse[n] = 0;
+            printf("Réponse du serveur : %s\n", reponse);
+
+            if (strcmp(reponse, "invalide") == 0) {
+                printf("Coup refusé par le serveur, recommencez.\n");
+                continue;
+            }
+
+            tir_valide = 1;
         }
-        reponse[n] = 0;
-        printf("Réponse du serveur : %s\n", reponse);
 
-        // Mettre à jour la grille de tirs
-        char lettre;
-        int chiffre;
         if (sscanf(coup, " %c%d", &lettre, &chiffre) == 2) {
             int ti = lettreVersIndice(lettre);
             int tj = chiffre;
@@ -185,13 +208,11 @@ int main(int argc, char *argv[]) {
                 strcpy(grilleTirs[ti][tj], "O");
         }
 
-        // Vérifier victoire du client
         if (strcmp(reponse, "victoire") == 0) {
             printf("Vous avez gagné !\n");
             break;
         }
 
-        // 3. Le serveur tire sur le client
         n = recv(sockfd, buffer, sizeof(buffer)-1, 0);
         if (n <= 0) break;
         buffer[n] = 0;
@@ -207,7 +228,6 @@ int main(int argc, char *argv[]) {
         printf("Le serveur a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
         afficherGrille(grilleJoueur);
 
-        // Vérifier victoire du serveur
         if (vieJoueur['#'] == 0 && vieJoueur['@'] == 0 && vieJoueur['%'] == 0 && vieJoueur['&'] == 0 && vieJoueur['$'] == 0) {
             send(sockfd, "victoire", 8, 0);
             printf("Le serveur a gagné !\n");
