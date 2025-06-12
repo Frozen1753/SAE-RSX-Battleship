@@ -13,80 +13,133 @@
 
 extern void initialiserGrille(char grille[DIM][DIM]);
 extern void sauvegarderGrille(char* buffer, char grille[DIM][DIM]);
-extern void afficherGrille(char grille[DIM][DIM], int cacher); // déjà dans battleships_mult.c
+extern void afficherGrille(char grille[DIM][DIM], int cacher);
 
 int lettreVersIndice(char lettre);
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <ip_serveur>\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    int sock_fd;
-    struct sockaddr_in server_addr;
-    char buffer[BUFFER_SIZE];
-
-    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_fd == -1) {
+void connect_to_server(int* sock_fd, struct sockaddr_in* server_addr, const char* ip) {
+    *sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (*sock_fd == -1) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = inet_addr(argv[1]);
+    server_addr->sin_family = AF_INET;
+    server_addr->sin_port = htons(PORT);
+    server_addr->sin_addr.s_addr = inet_addr(ip);
 
-    if (connect(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(*sock_fd, (struct sockaddr*)server_addr, sizeof(*server_addr)) < 0) {
         perror("Connection failed");
         exit(EXIT_FAILURE);
     }
+}
 
-    printf("Connecté au serveur.\n");
+void attendre_message(int sock_fd, char* buffer) {
+    memset(buffer, 0, BUFFER_SIZE);
     recv(sock_fd, buffer, BUFFER_SIZE, 0);
-    printf("%s\n", buffer);
+}
 
-    char grille[DIM][DIM];
-    char grille_tirs[DIM][DIM];
-
-    typedef struct {
-        char symbole;
-        int taille;
-        int restants;
-        int actif;
-    } Bateau;
-
-    Bateau flotte[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
-
+void placement_bateaux(char grille[DIM][DIM], Bateau flotte[5]) {
     initialiserGrille(grille);
-    initialiserGrille(grille_tirs);
-
     placement(grille, 1, flotte);
+}
 
+void envoyer_grille(int sock_fd, char grille[DIM][DIM]) {
+    char buffer[DIM * DIM + 1];
     sauvegarderGrille(buffer, grille);
     send(sock_fd, buffer, DIM * DIM + 1, 0);
+}
 
-    recv(sock_fd, buffer, BUFFER_SIZE, 0);
-    printf("%s\n", buffer);
+void afficher_jeu(char grille[DIM][DIM], char grille_tirs[DIM][DIM], const char* status, const char* info) {
+    system("clear");
+    if (status) printf("%s\n\n", status);
+    if (info && info[0]) printf("%s\n\n", info);
+    printf("--- VOTRE GRILLE PERSONNELLE ---\n");
+    afficherGrille(grille, 0);
+    printf("\n--- VOTRE GRILLE DE TIRS ---\n");
+    afficherGrille(grille_tirs, 0);
+}
+
+void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]) {
+    char buffer[BUFFER_SIZE];
+    char status[64] = "";
+    char info_message[128] = "";
+    char last_enemy_action[128] = ""; // Ce que l'ennemi vient de faire sur nous
+    char last_player_result[128] = ""; // Résultat de notre dernier tir
 
     while (1) {
-        memset(buffer, 0, BUFFER_SIZE);
-        recv(sock_fd, buffer, BUFFER_SIZE, 0);
-        printf("%s\n", buffer);
+        attendre_message(sock_fd, buffer);
 
-        // Affichage des deux grilles à chaque tour
-        printf("\n--- VOTRE GRILLE PERSONNELLE ---\n");
+        // On efface les statuts
+        status[0] = 0;
+        info_message[0] = 0;
+        // Le résultat de notre tir n'est affiché que quand on attend ("Attente..."), donc on le reset là
+        if (strncmp(buffer, "Votre tour", 10) == 0)
+            last_player_result[0] = 0;
+
+        int is_my_turn = 0;
+
+        if (strncmp(buffer, "Votre tour", 10) == 0) {
+            strcpy(status, "Votre tour");
+            is_my_turn = 1;
+            // Si un coup adverse vient d'arriver, on l'affiche dans info_message
+            if (last_enemy_action[0]) {
+                strcpy(info_message, last_enemy_action);
+                last_enemy_action[0] = 0; // on le consomme
+            }
+        }
+        else if (strncmp(buffer, "Attente", 7) == 0) {
+            strcpy(status, "Attente...");
+            // On affiche ici le résultat de notre tir
+            if (last_player_result[0]) {
+                strcpy(info_message, last_player_result);
+                last_player_result[0] = 0; // on le consomme
+            }
+        }
+        else if (strncmp(buffer, "L'adversaire a tiré sur", 23) == 0) {
+            // Parse le message pour mettre à jour la grille
+            char lettre;
+            int chiffre;
+            if (sscanf(buffer, "L'adversaire a tiré sur %c%d", &lettre, &chiffre) == 2) {
+                int i = lettreVersIndice(lettre);
+                int j = chiffre;
+                if (strstr(buffer, "Coulé")) {
+                    grille[i][j] = 'X';
+                    snprintf(last_enemy_action, sizeof(last_enemy_action),
+                        "L'ennemi a coulé votre bateau en (%c,%d) !", lettre, chiffre);
+                }
+                else if (strstr(buffer, "Touché")) {
+                    grille[i][j] = 'X';
+                    snprintf(last_enemy_action, sizeof(last_enemy_action),
+                        "L'ennemi a touché votre bateau en (%c,%d) !", lettre, chiffre);
+                }
+                else if (strstr(buffer, "Manqué")) {
+                    grille[i][j] = 'O';
+                    snprintf(last_enemy_action, sizeof(last_enemy_action),
+                        "L'ennemi a tiré en (%c,%d) et a raté.", lettre, chiffre);
+                }
+            }
+            // On ne fait pas d'affichage maintenant, on garde en mémoire pour le prochain "Votre tour"
+            continue; // On continue la boucle pour recevoir "Votre tour" ou autre
+        }
+
+        // Affichage général selon l'ordre demandé
+        system("clear");
+        printf("%s\n", status);
+        if (info_message[0]) printf("%s\n\n", info_message);
+
+        printf("--- VOTRE GRILLE PERSONNELLE ---\n");
         afficherGrille(grille, 0);
         printf("\n--- VOTRE GRILLE DE TIRS ---\n");
         afficherGrille(grille_tirs, 0);
 
-        if (strncmp(buffer, "Votre tour", 10) == 0) {
+        if (is_my_turn) {
             char ligne[BUFFER_SIZE];
             while (1) {
                 printf("Entrez une case à viser (ex: B4) : ");
                 fgets(ligne, sizeof(ligne), stdin);
 
-                if (strlen(ligne) < 2) continue; // entrée trop courte
+                if (strlen(ligne) < 2) continue;
                 ligne[strcspn(ligne, "\n")] = 0;
 
                 char lettre = toupper(ligne[0]);
@@ -96,7 +149,6 @@ int main(int argc, char* argv[]) {
                     continue;
                 }
 
-                // Vérifier si déjà tiré sur cette case
                 int i = lettreVersIndice(lettre);
                 int j = chiffre - '0';
                 if (grille_tirs[i][j] != '-') {
@@ -108,43 +160,81 @@ int main(int argc, char* argv[]) {
                 break;
             }
 
-            recv(sock_fd, buffer, BUFFER_SIZE, 0);
-            printf("%s\n", buffer);
+            // Résultat du tir
+            attendre_message(sock_fd, buffer);
 
-            // Mettre à jour la grille de tir selon le résultat
             char lettre = toupper(ligne[0]);
             char chiffre = ligne[1];
             int i = lettreVersIndice(lettre);
             int j = chiffre - '0';
-            if (strncmp(buffer, "Touché", 6) == 0)
+            if (strncmp(buffer, "Coulé", 5) == 0) {
                 grille_tirs[i][j] = 'X';
-            else if (strncmp(buffer, "Manqué", 6) == 0)
+                snprintf(last_player_result, sizeof(last_player_result), "Vous avez coulé un bateau en (%c,%d) !", lettre, j);
+            }
+            else if (strncmp(buffer, "Touché", 6) == 0) {
+                grille_tirs[i][j] = 'X';
+                snprintf(last_player_result, sizeof(last_player_result), "Vous avez touché un bateau en (%c,%d) !", lettre, j);
+            }
+            else if (strncmp(buffer, "Manqué", 6) == 0) {
                 grille_tirs[i][j] = 'O';
-        }
-        else if (strncmp(buffer, "Attente", 7) == 0) {
-            // On attend, rien à faire
-        }
-        else {
-            // On suppose que l'adversaire vient de tirer, essayer de deviner la case touchée à partir de la grille personnelle
-            // On peut afficher la grille personnelle après chaque tour pour voir l'évolution
+                snprintf(last_player_result, sizeof(last_player_result), "Vous avez tiré en (%c,%d) et avez manqué.", lettre, j);
+            }
+            else {
+                snprintf(last_player_result, sizeof(last_player_result), "Réponse du serveur : %s", buffer);
+            }
         }
 
-        // Affichage des deux grilles après action
-        printf("\n--- VOTRE GRILLE PERSONNELLE ---\n");
-        afficherGrille(grille, 0);
-        printf("\n--- VOTRE GRILLE DE TIRS ---\n");
-        afficherGrille(grille_tirs, 0);
-
+        // Fin de partie
         if (strncmp(buffer, "Victoire", 8) == 0) {
             printf("Vous avez gagné !\n");
             break;
         }
-
         if (strncmp(buffer, "Défaite", 7) == 0) {
             printf("Vous avez perdu.\n");
             break;
         }
     }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <ip_serveur>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    int sock_fd;
+    struct sockaddr_in server_addr;
+    char grille[DIM][DIM];
+    char grille_tirs[DIM][DIM];
+
+    Bateau flotte[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
+
+    connect_to_server(&sock_fd, &server_addr, argv[1]);
+
+    printf("Connecté au serveur.\n");
+
+    char buffer[BUFFER_SIZE];
+    while (1) {
+        memset(buffer, 0, BUFFER_SIZE);
+        recv(sock_fd, buffer, BUFFER_SIZE, 0);
+        if (strncmp(buffer, "Demmarage du jeu", 16) == 0) {
+            printf("Demmarage du jeu\n");
+            break;
+        }
+        else {
+            printf("%s\n", buffer); // "En attente de l'autre joueur..."
+        }
+    }
+
+    placement_bateaux(grille, flotte);
+    initialiserGrille(grille_tirs);
+
+    envoyer_grille(sock_fd, grille);
+
+    attendre_message(sock_fd, buffer);
+    printf("%s\n", buffer);
+
+    jouer_partie(sock_fd, grille, grille_tirs);
 
     close(sock_fd);
     return 0;

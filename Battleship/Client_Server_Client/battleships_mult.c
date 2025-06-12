@@ -76,25 +76,56 @@ void placement(char grille[DIM][DIM], int joueur, Bateau flotte[]) {
             if (flotte[i].actif)
                 printf("%d. Bateau taille %d symbole '%c'\n", i + 1, flotte[i].taille, flotte[i].symbole);
 
-        int choix;
-        scanf("%d", &choix);
+        int choix = -1;
+        char line[32];
+        printf("Votre choix : ");
+        if (!fgets(line, sizeof(line), stdin) || sscanf(line, "%d", &choix) != 1) {
+            printf("Entrée invalide. Merci de saisir un chiffre.\n");
+            continue;
+        }
         choix--;
-        if (choix < 0 || choix >= 5 || !flotte[choix].actif) continue;
+        if (choix < 0 || choix >= 5 || !flotte[choix].actif) {
+            printf("Choix de bateau invalide.\n");
+            continue;
+        }
 
         char lettre;
-        int j, rot;
+        int i = -1, j = -1, rot = -1;
+
         printf("Lettre (A-J) : ");
-        scanf(" %c", &lettre);
-        int i = lettreVersIndice(lettre);
+        if (!fgets(line, sizeof(line), stdin) || sscanf(line, " %c", &lettre) != 1) {
+            printf("Entrée invalide pour la lettre.\n");
+            continue;
+        }
+        lettre = toupper(lettre);
+        if (lettre < 'A' || lettre > 'J') {
+            printf("Lettre hors bornes (A-J).\n");
+            continue;
+        }
+        i = lettreVersIndice(lettre);
 
         printf("Chiffre (0-9) : ");
-        scanf("%d", &j);
+        if (!fgets(line, sizeof(line), stdin) || sscanf(line, "%d", &j) != 1) {
+            printf("Entrée invalide pour le chiffre.\n");
+            continue;
+        }
+        if (j < 0 || j >= DIM) {
+            printf("Chiffre hors bornes (0-9).\n");
+            continue;
+        }
 
         printf("Rotation (1=nord, 2=est, 3=sud, 4=ouest) : ");
-        scanf("%d", &rot);
+        if (!fgets(line, sizeof(line), stdin) || sscanf(line, "%d", &rot) != 1) {
+            printf("Entrée invalide pour la rotation.\n");
+            continue;
+        }
+        if (rot < 1 || rot > 4) {
+            printf("Rotation hors bornes (1-4).\n");
+            continue;
+        }
 
         if (!peutPlacer(flotte[choix].taille, rot, i, j, grille)) {
-            printf("Placement invalide.\n");
+            printf("Placement invalide (emplacement ou superposition).\n");
             continue;
         }
 
