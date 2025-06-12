@@ -54,20 +54,6 @@ void placerBateau(int taille, int rot, int i, int j, char symbole, char grille[D
     }
 }
 
-void placementIA(char grille[DIM][DIM][3], Bateau flotte[]) {
-    for (int b = 0; b < 5; b++) {
-        int ok = 0;
-        while (!ok) {
-            int rot = rand() % 4 + 1;
-            int i = rand() % 10 + 1;
-            int j = rand() % 10 + 1;
-            if (peutPlacer(flotte[b].taille, rot, i, j, grille)) {
-                placerBateau(flotte[b].taille, rot, i, j, flotte[b].symbole, grille);
-                ok = 1;
-            }
-        }
-    }
-}
 
 void afficherGrille(char grille[DIM][DIM][3]) {
     for (int i = 0; i < DIM; i++) {
@@ -111,6 +97,36 @@ void demanderTir(char* coup) {
     scanf("%s", coup);
 }
 
+void placementManuel(char grille[DIM][DIM][3], Bateau flotte[]) {
+    printf("=== Placement manuel des bateaux (Serveur) ===\n");
+    for (int b = 0; b < 5; b++) {
+        int ok = 0;
+        while (!ok) {
+            afficherGrille(grille);
+            printf("Placer le bateau %c (taille %d)\n", flotte[b].symbole, flotte[b].taille);
+            char ligne[8];
+            char lettre;
+            int chiffre, rot;
+            printf("Entrer la case de départ (ex: B5) : ");
+            scanf("%s", ligne);
+            if (sscanf(ligne, " %c%d", &lettre, &chiffre) != 2) {
+                printf("Entrée invalide.\n");
+                continue;
+            }
+            printf("Orientation (1=haut, 2=droite, 3=bas, 4=gauche) : ");
+            scanf("%d", &rot);
+            int i = lettreVersIndice(lettre);
+            int j = chiffre;
+            if (peutPlacer(flotte[b].taille, rot, i, j, grille)) {
+                placerBateau(flotte[b].taille, rot, i, j, flotte[b].symbole, grille);
+                ok = 1;
+            } else {
+                printf("Placement impossible, réessayez.\n");
+            }
+        }
+    }
+}
+
 int main() {
     srand(time(NULL));
     // --- Initialisation réseau ---
@@ -135,13 +151,13 @@ int main() {
         return 1;
     }
 
-    // --- Initialisation jeu joueur serveur (APRÈS réception du "pret") ---
+    // --- Placement manuel des bateaux du serveur ---
     char grilleServeur[DIM][DIM][3];
     initialiserGrille(grilleServeur);
     Bateau flotteServeur[5] = { {'#',5,5,1},{'@',4,4,1},{'%',3,3,1},{'&',3,3,1},{'$',2,2,1} };
     int vieServeur[128] = {0};
     vieServeur['#'] = 5; vieServeur['@'] = 4; vieServeur['%'] = 3; vieServeur['&'] = 3; vieServeur['$'] = 2;
-    placementIA(grilleServeur, flotteServeur);
+    placementManuel(grilleServeur, flotteServeur);
 
     // Répondre au client qu'on est prêt
     send(client_sock, "pret", 4, 0);
@@ -161,7 +177,7 @@ int main() {
         }
         int i = lettreVersIndice(lettre);
         int j = chiffre;
-        traiterTir(grilleServeur, vieServeur, i, j, reponse); // <-- ici
+        traiterTir(grilleServeur, vieServeur, i, j, reponse);
         send(client_sock, reponse, strlen(reponse), 0);
 
         printf("Le client a tiré sur %c%d : %s\n", lettre, chiffre, reponse);
@@ -184,9 +200,6 @@ int main() {
         if (n <= 0) break;
         reponse[n] = 0;
         printf("Réponse du client à %s : %s\n", coup, reponse);
-
-        // Mettre à jour la grille de tirs du serveur (optionnel)
-        // ... (vous pouvez ajouter une grille de tirs côté serveur si vous voulez)
 
         // Vérifier victoire du serveur
         if (strcmp(reponse, "victoire") == 0) {
