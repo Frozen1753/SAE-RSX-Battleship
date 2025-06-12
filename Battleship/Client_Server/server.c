@@ -124,6 +124,16 @@ int main() {
     vieIA['#'] = 5; vieIA['@'] = 4; vieIA['%'] = 3; vieIA['&'] = 3; vieIA['$'] = 2;
     placementIA(grilleIA, flotteIA);
 
+    // --- Synchronisation : attendre que le client soit prêt ---
+    char syncbuf[16];
+    int syncn = recv(client_sock, syncbuf, sizeof(syncbuf)-1, 0);
+    if (syncn <= 0 || strncmp(syncbuf, "pret", 4) != 0) {
+        printf("Erreur de synchronisation avec le client.\n");
+        close(client_sock);
+        close(sockfd);
+        return 1;
+    }
+
     // --- Boucle de jeu ---
     char buffer[32];
     while (1) {

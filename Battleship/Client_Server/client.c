@@ -142,6 +142,9 @@ int main(int argc, char *argv[]) {
     // Placement manuel du joueur client
     placementManuel(grilleJoueur, flotteJoueur);
 
+    // Synchronisation : prévenir le serveur qu'on est prêt
+    send(sockfd, "pret", 4, 0);
+
     char buffer[32], reponse[16];
     while (1) {
         // 1. Le serveur tire sur le client
