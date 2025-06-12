@@ -198,6 +198,10 @@ int main() {
         }
         int i = lettreVersIndice(lettre);
         int j = chiffre;
+        if (!valides(i, j)) {
+            send(client_sock, "invalide", 8, 0);
+            continue;
+        }
         traiterTir(grilleServeur, vieServeur, i, j, reponse);
         send(client_sock, reponse, strlen(reponse), 0);
 
