@@ -209,7 +209,9 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(reponse, "victoire") == 0) {
-            printf("Vous avez gagné !\n");
+            printf("\n=== FIN DE PARTIE ===\n");
+            printf("%s\n", reponse + 9); // Affiche le message après "victoire: "
+            printf("=====================\n");
             break;
         }
 

@@ -212,7 +212,8 @@ int main() {
         }
 
         if (vieServeur['#'] == 0 && vieServeur['@'] == 0 && vieServeur['%'] == 0 && vieServeur['&'] == 0 && vieServeur['$'] == 0) {
-            send(client_sock, "victoire", 8, 0);
+            const char* msgVictoire = "victoire: Bravo ! Vous avez coulé tous les bateaux du serveur !";
+            send(client_sock, msgVictoire, strlen(msgVictoire), 0);
             printf("\n=== FIN DE PARTIE ===\n");
             printf("Bravo ! Le client a coulé tous vos bateaux et remporte la victoire !\n");
             printf("=====================\n");
