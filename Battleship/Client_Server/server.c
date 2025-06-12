@@ -232,7 +232,10 @@ int main() {
                 strcpy(grilleEnnemie[i][j], "O");
             }
         }
+        
         afficherGrilleEnnemie(grilleEnnemie);
+        afficherGrille(grilleServeur);         // Affiche ta grille (avec tes bateaux)
+        afficherGrilleEnnemie(grilleEnnemie);  // Affiche la grille adverse (seulement tes tirs)
 
         // Vérifier victoire du serveur
         if (strcmp(reponse, "victoire") == 0) {
