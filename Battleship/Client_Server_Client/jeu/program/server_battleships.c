@@ -152,7 +152,7 @@ int jouer_partie(char grille1[DIM][DIM], char grille2[DIM][DIM], struct sockaddr
 
         // --- Envoi des instructions de tour ---
         if (tour > 0) {
-            // Pour tous les tours sauf le premier, on notifie le joueur qui va jouer de l'action adverse
+			printf("Notification de l'action adverse : %s\n", notif);
             send_until_success(clients[joueur_actif], notif, strlen(notif), 0);
         }
         printf("Tour %d : Joueur %d (%s) joue contre Joueur %d (%s)\n", tour + 1, joueur_actif + 1, inet_ntoa(client_addrs[joueur_actif]->sin_addr), joueur_suivant + 1, inet_ntoa(client_addrs[joueur_suivant]->sin_addr));
@@ -217,7 +217,8 @@ int jouer_partie(char grille1[DIM][DIM], char grille2[DIM][DIM], struct sockaddr
             snprintf(notif, sizeof(notif), "L'adversaire a tire sur %c%d : Manque.\n", lettre, j);
         }
 
-        printf("Envoi du message au joueur %d (%s) : %s\n", joueur_actif + 1, inet_ntoa(client_addrs[joueur_actif]->sin_addr), msg);
+        send_until_success(clients[joueur_suivant], notif, strlen(notif), 0);
+
         send_until_success(clients[joueur_actif], msg, strlen(msg), 0);
 
         if (estFini(grilles[joueur_suivant])) {
