@@ -64,7 +64,7 @@ void placerBateau(int taille, int rot, int i, int j, char symbole, char grille[D
 }
 
 void placement(char grille[DIM][DIM], int joueur, Bateau flotte[]) {
-    printf("Placement des bateaux du Joueur %d\n", joueur);
+    printf("Placement des bateaux :\n");
     while (1) {
         int fini = 1;
         for (int k = 0; k < 5; k++) if (flotte[k].actif) fini = 0;
