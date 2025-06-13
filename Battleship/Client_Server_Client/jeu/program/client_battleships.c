@@ -69,29 +69,31 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
     char buffer[BUFFER_SIZE];
     char status[64] = "";
     char info_message[128] = "";
-    char last_enemy_action[128] = ""; // Ce que l'ennemi vient de faire sur nous
-    char last_player_result[128] = ""; // Resultat de notre dernier tir
+    char last_enemy_action[128] = ""; // ce que l'ennemi vient de faire sur nous
+    char last_player_result[128] = ""; // resultat de notre dernier tir
 
     while (1) {
         attendre_message(sock_fd, buffer);
 
-        // Process all lines in buffer (split on '\n')
+        // split des '\n'
         char *saveptr;
         char *line = strtok_r(buffer, "\n", &saveptr);
         while (line) {
-            // On efface les statuts
+            // reset status
             status[0] = 0;
             info_message[0] = 0;
-            // Le resultat de notre tir n'est affiche que quand on attend ("Attente..."), donc on le reset la
-            if (strncmp(line, "Votre tour", 10) == 0)
+
+            // le resultat du tir n'est affiche que quand on attend, donc on le reset la
+            if (strncmp(line, "Votre tour", 10) == 0) {
                 last_player_result[0] = 0;
+            }
 
             int is_my_turn = 0;
 
             if (strncmp(line, "Votre tour", 10) == 0) {
                 strcpy(status, "Votre tour");
                 is_my_turn = 1;
-                // Si un coup adverse vient d'arriver, on l'affiche dans info_message
+                // si un tir ennemi arrive, on l'affiche dans info_message
                 if (last_enemy_action[0]) {
                     strcpy(info_message, last_enemy_action);
                     last_enemy_action[0] = 0; // on le consomme
@@ -99,7 +101,7 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
             }
             else if (strncmp(line, "Attente...", 10) == 0) {
                 strcpy(status, "Attente...");
-                // On affiche ici le resultat de notre tir
+                // on affiche le resultat de nptre tir
                 if (last_player_result[0]) {
                     strcpy(info_message, last_player_result);
                     last_player_result[0] = 0; // on le consomme
@@ -113,9 +115,11 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
                 if (sscanf(line, "L'adversaire a tire sur %c%d : %15[^!]", &lettre, &chiffre, resultat) == 3) {
                     int i = lettreVersIndice(lettre);
                     int j = chiffre;
-                    // retire éventuel espace avant le mot
+
+                    // retire eventuel espace avant le mot
                     char* p = resultat;
                     while (*p == ' ') ++p;
+
                     if (strncmp(p, "Coule", 5) == 0) {
                         grille[i][j] = 'X';
                         snprintf(last_enemy_action, sizeof(last_enemy_action),
@@ -136,7 +140,7 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
                 continue;
             }
 
-            // Affichage general selon l'ordre demande
+            // affichage grille actualisee et info
             system("clear");
             printf("%s\n", status);
             if (info_message[0]) printf("%s\n\n", info_message);
@@ -173,7 +177,7 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
                     break;
                 }
 
-                // Resultat du tir
+                // resultats du tir
                 attendre_message(sock_fd, buffer);
 
                 char lettre = toupper(ligne[0]);
@@ -197,7 +201,7 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
                 }
             }
 
-            // Fin de partie
+            // end game
             if (strncmp(line, "Victoire", 8) == 0) {
                 printf("Vous avez gagne !\n");
                 exit(0);

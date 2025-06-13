@@ -13,7 +13,6 @@
 
 int server_fd, client1_fd = -1, client2_fd = -1;
 
-// Protostub pour chargerGrille et lettreVersIndice (a remplacer par vraies fonctions)
 void chargerGrille(const char* buffer, char grille[DIM][DIM]);
 int lettreVersIndice(char c);
 
@@ -44,7 +43,7 @@ void init_server(struct sockaddr_in* server_addr) {
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) { perror("socket failed"); exit(EXIT_FAILURE); }
 
-    // Allow address reuse to avoid "Address already in use" error
+    // evite l'erreur "Address already in use" (ladresse peut etre reutilisee)
     int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("setsockopt(SO_REUSEADDR) failed");
@@ -73,7 +72,7 @@ void accept_clients(struct sockaddr_in *client_addr1, struct sockaddr_in *client
     client2_fd = accept(server_fd, (struct sockaddr*)client_addr2, addr_len);
     printf("Client 2 connecte (%s).\n", inet_ntoa(client_addr2->sin_addr));
 
-    // Demarrage du jeu pour les deux
+    // demarrage du jeu pour les deux
     send(client1_fd, "Demmarage du jeu", 17, 0);
     send(client2_fd, "Demmarage du jeu", 17, 0);
 	printf("Demmarage du jeu...\n");
@@ -137,29 +136,29 @@ int jouer_partie(char grille1[DIM][DIM], char grille2[DIM][DIM], struct sockaddr
     char buffer[BUFFER_SIZE];
     printf("Debut de la partie...\n");
 
-    int current = 0; // joueur courant (0 ou 1)
-    int clients[2] = { client1_fd, client2_fd };
+    int current = 0; // joueur actuelle (0 ou 1)
+    int clients[2] = { client1_fd, client2_fd }; //sockets
     char (*grilles[2])[DIM] = { grille1, grille2 };
     struct sockaddr_in* client_addrs[2] = { client_addr1, client_addr2 };
 
-    char notif[128] = "";
+    char notif[128] = ""; // message d'info action adverse
 
     int tour = 0;
 
     while (1) {
         int joueur_actif = current;
-        int joueur_suivant = 1 - current;
+        int joueur_suivant = 1 - current; // adversaire
 
-        // --- Envoi des instructions de tour ---
+        // instruction de tour
         if (tour > 0) {
 			printf("Notification de l'action adverse : %s\n", notif);
             send_until_success(clients[joueur_actif], notif, strlen(notif), 0);
         }
         printf("Tour %d : Joueur %d (%s) joue contre Joueur %d (%s)\n", tour + 1, joueur_actif + 1, inet_ntoa(client_addrs[joueur_actif]->sin_addr), joueur_suivant + 1, inet_ntoa(client_addrs[joueur_suivant]->sin_addr));
-        send_until_success(clients[joueur_actif], "Votre tour\n", 11, 0); // send with newline
-        send_until_success(clients[joueur_suivant], "Attente...\n", 11, 0); // send with newline
+        send_until_success(clients[joueur_actif], "Votre tour\n", 11, 0);
+        send_until_success(clients[joueur_suivant], "Attente...\n", 11, 0);
 
-        // --- Reception du coup du joueur actif ---
+        // reception des coords
         memset(buffer, 0, BUFFER_SIZE);
         int recvd = recv(clients[joueur_actif], buffer, BUFFER_SIZE, 0);
         if (recvd <= 0) {
@@ -169,6 +168,7 @@ int jouer_partie(char grille1[DIM][DIM], char grille2[DIM][DIM], struct sockaddr
         }
         printf("Coordonnees recues du client %d (%s) : '%s'\n", joueur_actif + 1, inet_ntoa(client_addrs[joueur_actif]->sin_addr), buffer);
 
+        // debugage
         printf("DEBUG: buffer='%s', len=%zu, bytes=[%02x %02x %02x]\n", buffer, strlen(buffer), buffer[0], buffer[1], buffer[2]);
         if (strlen(buffer) < 2) {
             printf("Erreur: coordonnees trop courtes ! (buffer='%s')\n", buffer);
@@ -199,6 +199,7 @@ int jouer_partie(char grille1[DIM][DIM], char grille2[DIM][DIM], struct sockaddr
 
         char* msg;
 
+        // MAJ grille adverse
         char symbole = grilles[joueur_suivant][i][j];
         if (symbole != '-') {
             grilles[joueur_suivant][i][j] = 'X';
