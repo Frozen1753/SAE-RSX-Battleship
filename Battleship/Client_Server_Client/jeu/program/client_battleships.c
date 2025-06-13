@@ -105,32 +105,35 @@ void jouer_partie(int sock_fd, char grille[DIM][DIM], char grille_tirs[DIM][DIM]
                     last_player_result[0] = 0; // on le consomme
                 }
             }
-            else if (strncmp(line, "L'adversaire a tire sur", 24) == 0) {
-                // Parse le message pour mettre a jour la grille
+            else if (strncmp(line, "L'adversaire a tire sur", 23) == 0) {
+                printf("Action de l'ennemi : %s\n", line);
                 char lettre;
                 int chiffre;
-                if (sscanf(line, "L'adversaire a tire sur %c%d", &lettre, &chiffre) == 2) {
+                char resultat[16] = "";
+                if (sscanf(line, "L'adversaire a tire sur %c%d : %15[^!]", &lettre, &chiffre, resultat) == 3) {
                     int i = lettreVersIndice(lettre);
                     int j = chiffre;
-                    if (strncmp(line + 27, "Coule", 5) == 0) {
+                    // retire éventuel espace avant le mot
+                    char* p = resultat;
+                    while (*p == ' ') ++p;
+                    if (strncmp(p, "Coule", 5) == 0) {
                         grille[i][j] = 'X';
                         snprintf(last_enemy_action, sizeof(last_enemy_action),
                             "L'ennemi a coule votre bateau en (%c,%d)!", lettre, chiffre);
                     }
-                    else if (strncmp(line + 27, "Touche", 6) == 0) {
+                    else if (strncmp(p, "Touche", 6) == 0) {
                         grille[i][j] = 'X';
                         snprintf(last_enemy_action, sizeof(last_enemy_action),
                             "L'ennemi a touche votre bateau en (%c,%d)!", lettre, chiffre);
                     }
-                    else if (strncmp(line + 27, "Manque", 6) == 0) {
+                    else if (strncmp(p, "Manque", 6) == 0) {
                         grille[i][j] = 'O';
                         snprintf(last_enemy_action, sizeof(last_enemy_action),
                             "L'ennemi a tire en (%c,%d) et a rate.", lettre, chiffre);
                     }
                 }
-                // On ne fait pas d'affichage maintenant, on garde en memoire pour le prochain "Votre tour"
                 line = strtok_r(NULL, "\n", &saveptr);
-                continue; // On continue la boucle pour recevoir "Votre tour" ou autre
+                continue;
             }
 
             // Affichage general selon l'ordre demande
